@@ -1,0 +1,67 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --user postgres"]
+      interval: 1s
+      timeout: 10s
+      retries: 10
+      start_interval: 1s
+
+  create-db-job:
+    image: postgres:15
+    container_name: postgres-client-job
+    environment:
+      PGPASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    # https://stackoverflow.com/questions/18389124/simulate-create-database-if-not-exists-for-postgresql
+    command:
+      - "bash"
+      - "-c"
+      - echo "SELECT 'CREATE DATABASE db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'db')\gexec" | psql --host db --username postgres
+
+  optuna-create-study-job:
+    image: optuna/optuna:v3.5.0-py3.10
+    platform: "linux/amd64"
+    container_name: optuna-create-study-job
+    command:
+      - optuna
+      - create-study
+      - --study-name
+      - study
+      - --storage
+      - postgresql+psycopg2://postgres:postgres@db:5432/db
+      - --skip-if-exists
+      # スコアの最大化を目的とするときは以下のオプションをつけるか、評価関数に `-1` を乗算します
+      # - --direction
+      # - maximize
+    depends_on:
+      create-db-job:
+        condition: service_completed_successfully
+
+  optuna-dashboard:
+    image: ghcr.io/optuna/optuna-dashboard
+    platform: "linux/amd64"  # QEMU のある arm64 アーキテクチャ用
+    container_name: optuna-dashboard
+    ports:
+      - "8080:8080"
+    command: ["postgresql+psycopg2://postgres:postgres@db:5432/db"]
+    depends_on:
+      create-db-job:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:

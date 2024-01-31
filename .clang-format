@@ -1,0 +1,12 @@
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++17
+BreakBeforeBraces: Allman
+AlignAfterOpenBracket: BlockIndent
+BinPackParameters: false
+BinPackArguments: false
+BreakConstructorInitializers: BeforeComma
+AccessModifierOffset: -2
+IncludeBlocks: Preserve
+DerivePointerAlignment: false
+ReferenceAlignment: Left
